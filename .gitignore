@@ -1,0 +1,7 @@
+bin/
+obj/
+publish/
+.vs/
+
+# 含 Oracle 連線密碼，不進版控
+appsettings.json

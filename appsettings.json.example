@@ -1,0 +1,16 @@
+{
+  "Oracle": {
+    "ConnectionString": "User Id=YOUR_USER;Password=YOUR_PASSWORD;Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=YOUR_HOST)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=YOUR_SERVICE)))"
+  },
+  "FileEncoding": "big5",
+  "ImportDirectories": [
+    "D:\\FTPs_Site\\first",
+    "D:\\FTPs_Site\\taishin",
+    "D:\\FTPs_Site\\hncb",
+    "D:\\FTPs_Site\\BNKHD01"
+  ],
+  "RenameOnBackupFiles": [
+    "GAC070.txt",
+    "TPPNB123.txt"
+  ]
+}
