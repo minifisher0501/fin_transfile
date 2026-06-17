@@ -1,3 +1,5 @@
+using FileImporter.Models;
+
 namespace FileImporter.Services;
 
 public class FileImportService
@@ -11,20 +13,21 @@ public class FileImportService
         _oracleService = oracleService;
         _backupService  = backupService;
 
-        // 註冊 Big5 等非 Unicode 編碼（.NET Core 需要）
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         _encoding = System.Text.Encoding.GetEncoding(fileEncoding);
     }
 
     /// <summary>
-    /// 處理單一目錄：掃描所有 .csv / .txt 並逐檔匯入
+    /// 處理單一目錄，回傳該目錄發生的所有錯誤清單
     /// </summary>
-    public async Task ProcessDirectoryAsync(string directoryPath)
+    public async Task<List<ImportError>> ProcessDirectoryAsync(string directoryPath)
     {
+        var errors = new List<ImportError>();
+
         if (!Directory.Exists(directoryPath))
         {
             Console.WriteLine($"[SKIP] 目錄不存在：{directoryPath}");
-            return;
+            return errors;
         }
 
         var files = Directory.GetFiles(directoryPath, "*.*")
@@ -39,30 +42,33 @@ public class FileImportService
         if (files.Count == 0)
         {
             Console.WriteLine($"[INFO] 無待處理檔案：{directoryPath}");
-            return;
+            return errors;
         }
 
         Console.WriteLine($"[INFO] 開始處理目錄：{directoryPath}，共 {files.Count} 個檔案");
 
         foreach (var filePath in files)
         {
-            await ProcessFileAsync(directoryPath, filePath);
+            var fileErrors = await ProcessFileAsync(directoryPath, filePath);
+            errors.AddRange(fileErrors);
         }
+
+        return errors;
     }
 
     /// <summary>
-    /// 處理單一檔案：讀取 → Insert → 備份，失敗則寫 Log
+    /// 處理單一檔案，回傳該檔案的錯誤清單（Insert 錯誤 + Procedure 錯誤）
     /// </summary>
-    private async Task ProcessFileAsync(string directoryPath, string filePath)
+    private async Task<List<ImportError>> ProcessFileAsync(string directoryPath, string filePath)
     {
-        var fileName  = Path.GetFileName(filePath);
-        var dirName   = new DirectoryInfo(directoryPath).Name;
+        var errors   = new List<ImportError>();
+        var fileName = Path.GetFileName(filePath);
+        var dirName  = new DirectoryInfo(directoryPath).Name;
 
         Console.WriteLine($"  [FILE] {fileName}");
 
         try
         {
-            // 讀取所有非空白行（Tab 分隔，原始保留）
             var lines = File.ReadAllLines(filePath, _encoding)
                 .Where(l => !string.IsNullOrWhiteSpace(l))
                 .ToList();
@@ -70,28 +76,52 @@ public class FileImportService
             if (lines.Count == 0)
             {
                 Console.WriteLine($"  [SKIP] 檔案無資料：{fileName}");
-                return;
+                return errors;
             }
 
-            // 寫入 Oracle
-            await _oracleService.BulkInsertAsync(dirName, fileName, lines);
+            // Insert + 呼叫 Procedure
+            var procError = await _oracleService.BulkInsertAsync(dirName, fileName, lines);
 
-            // 備份原始檔
+            // 備份原始檔（不管 procedure 成功與否，insert 已 commit 就備份）
             _backupService.Backup(filePath);
 
-            Console.WriteLine($"  [OK]   {fileName}，共 {lines.Count} 筆");
+            if (procError is not null)
+            {
+                Console.WriteLine($"  [PROC ERROR] {fileName}：{procError}");
+                var err = new ImportError
+                {
+                    Directory = directoryPath,
+                    FileName  = fileName,
+                    Message   = procError,
+                    Type      = ErrorType.ProcedureError
+                };
+                errors.Add(err);
+                WriteErrorLog(directoryPath, $"[PROC ERROR] {DateTime.Now:yyyy-MM-dd HH:mm:ss} | 檔案：{fileName} | {procError}{Environment.NewLine}");
+            }
+            else
+            {
+                Console.WriteLine($"  [OK]   {fileName}，共 {lines.Count} 筆");
+            }
         }
         catch (Exception ex)
         {
-            var errorMsg = $"[ERROR] {DateTime.Now:yyyy-MM-dd HH:mm:ss} | 檔案：{fileName} | {ex.Message}{Environment.NewLine}";
-            Console.WriteLine($"  {errorMsg.Trim()}");
-            WriteErrorLog(directoryPath, errorMsg);
+            var msg = ex.Message;
+            Console.WriteLine($"  [ERROR] {fileName}：{msg}");
+
+            var err = new ImportError
+            {
+                Directory = directoryPath,
+                FileName  = fileName,
+                Message   = msg,
+                Type      = ErrorType.InsertError
+            };
+            errors.Add(err);
+            WriteErrorLog(directoryPath, $"[ERROR] {DateTime.Now:yyyy-MM-dd HH:mm:ss} | 檔案：{fileName} | {msg}{Environment.NewLine}");
         }
+
+        return errors;
     }
 
-    /// <summary>
-    /// 將錯誤寫入目錄下的 import_error.log
-    /// </summary>
     private static void WriteErrorLog(string directoryPath, string message)
     {
         try

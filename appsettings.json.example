@@ -12,5 +12,15 @@
   "RenameOnBackupFiles": [
     "GAC070.txt",
     "TPPNB123.txt"
-  ]
+  ],
+  "Email": {
+    "SmtpHost": "smtp.your-company.com",
+    "SmtpPort": 25,
+    "UseSsl": false,
+    "From": "sender@your-company.com",
+    "To": [
+      "recipient1@your-company.com",
+      "recipient2@your-company.com"
+    ]
+  }
 }

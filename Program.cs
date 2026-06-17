@@ -18,13 +18,32 @@ if (string.IsNullOrWhiteSpace(importConfig.Oracle.ConnectionString))
 var oracleService = new OracleService(importConfig.Oracle.ConnectionString);
 var backupService = new FileBackupService(importConfig.RenameOnBackupFiles);
 var importService = new FileImportService(oracleService, backupService, importConfig.FileEncoding);
+var emailService  = new EmailService(importConfig.Email);
 
 // ── 主流程 ────────────────────────────────────────────────
 Console.WriteLine($"===== FileImporter 開始 {DateTime.Now:yyyy-MM-dd HH:mm:ss} =====");
 
+var allErrors = new List<FileImporter.Models.ImportError>();
+
 foreach (var dir in importConfig.ImportDirectories)
 {
-    await importService.ProcessDirectoryAsync(dir);
+    var errors = await importService.ProcessDirectoryAsync(dir);
+    allErrors.AddRange(errors);
+}
+
+// ── 匯整錯誤寄送通知 mail ─────────────────────────────────
+if (allErrors.Count > 0)
+{
+    Console.WriteLine($"[MAIL] 發現 {allErrors.Count} 個錯誤，準備寄送通知...");
+    try
+    {
+        await emailService.SendErrorSummaryAsync(allErrors);
+        Console.WriteLine("[MAIL] 通知信已寄出");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[MAIL ERROR] 寄信失敗：{ex.Message}");
+    }
 }
 
 Console.WriteLine($"===== FileImporter 完成 {DateTime.Now:yyyy-MM-dd HH:mm:ss} =====");
