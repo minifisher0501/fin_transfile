@@ -78,12 +78,12 @@ public class OracleService
     }
 
     /// <summary>
-    /// 呼叫 bnk.bnk_trans_normal_file，回傳 o_error_msg（無錯誤則為 null）
+    /// 呼叫 bnk.bnk_hawd_pkg.p_exec_hawd_job，回傳 o_error_msg（無錯誤則為 null）
     /// </summary>
     private static async Task<string?> CallProcedureAsync(OracleConnection conn, string sessionId)
     {
         await using var cmd = new OracleCommand(
-            "BEGIN bnk.bnk_trans_normal_file(:i_session_id, :o_error_msg); END;", conn);
+            "BEGIN bnk.bnk_hawd_pkg.p_exec_hawd_job(:i_session_id, :o_error_msg); END;", conn);
         cmd.BindByName = true;
 
         cmd.Parameters.Add(new OracleParameter("i_session_id", OracleDbType.Varchar2, sessionId, System.Data.ParameterDirection.Input));
