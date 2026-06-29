@@ -34,7 +34,7 @@ public class FileImportService
             .Where(f =>
             {
                 var ext = Path.GetExtension(f).ToLowerInvariant();
-                return ext == ".csv" || ext == ".txt";
+                return ext == ".csv" || ext == ".txt" || ext == string.Empty;
             })
             .OrderBy(f => f)
             .ToList();

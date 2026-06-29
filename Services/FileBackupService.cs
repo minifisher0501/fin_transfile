@@ -38,9 +38,11 @@ public class FileBackupService
     /// </summary>
     private static string BuildRenamedFileName(string fileName)
     {
-        var ext         = Path.GetExtension(fileName);
+        var ext            = Path.GetExtension(fileName);
         var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
-        var timestamp   = DateTime.Now.ToString("yyyyMMddHHmm");
+        var timestamp      = DateTime.Now.ToString("yyyyMMddHHmm");
+        // 無副檔名時補 .txt
+        if (string.IsNullOrEmpty(ext)) ext = ".txt";
         return $"{nameWithoutExt}_{timestamp}{ext}";
     }
 
