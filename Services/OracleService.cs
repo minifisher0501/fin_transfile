@@ -91,7 +91,11 @@ public class OracleService
 
         await cmd.ExecuteNonQueryAsync();
 
-        var errorMsg = cmd.Parameters["o_error_msg"].Value?.ToString();
+        // ODP.NET OUT 參數無值時 Value 為 OracleString.Null，ToString() 會回傳字串 "null"
+        var raw = cmd.Parameters["o_error_msg"].Value;
+        var errorMsg = (raw is Oracle.ManagedDataAccess.Types.OracleString oStr && !oStr.IsNull)
+            ? oStr.Value
+            : null;
         return string.IsNullOrWhiteSpace(errorMsg) ? null : errorMsg;
     }
 }
